@@ -1,5 +1,7 @@
 import { sequelize } from '../database/db.js';
 import SQ from 'sequelize';
+import { User } from './auth.js';
+const Sequelize = SQ.Sequelize;
 const DataTypes = SQ.DataTypes;
 
 const Tweet = sequelize.define('tweet', {
@@ -14,35 +16,53 @@ const Tweet = sequelize.define('tweet', {
 		type: DataTypes.TEXT,
 		allowNull: false,
 	},
-	userId: {
-		type: DataTypes.INTEGER,
-		allowNull: false,
-	},
 });
+Tweet.belongsTo(User);
+const INCLUDE_USER = {
+	attributes: [
+		'id',
+		'text',
+		'createdAt',
+		'userId',
+		[Sequelize.col('user.name'), 'name'],
+		[Sequelize.col('user.username'), 'username'],
+		[Sequelize.col('user.url'), 'url'],
+	],
+	include: {
+		model: User,
+		attributes: [],
+	},
+};
 
 const ORDER_DESC = {
 	order: [['createdAt', 'DESC']],
 };
 
 export async function getAll() {
-	return Tweet.findAll({ ...ORDER_DESC });
+	return Tweet.findAll({ ...INCLUDE_USER, ...ORDER_DESC });
 }
 
-export async function getAllByUsername(userId) {
+export async function getAllByUsername(username) {
 	return Tweet.findAll({
-		where: { userId },
+		...INCLUDE_USER,
 		...ORDER_DESC,
+		include: {
+			...INCLUDE_USER.include,
+			where: { username },
+		},
 	});
 }
 
-export async function getAllById(id) {
-	return Tweet.findByPk(id);
+export async function getById(id) {
+	return Tweet.findOne({
+		...INCLUDE_USER,
+		where: { id },
+	});
 }
 
 export async function create(text, userId) {
 	return Tweet.create({ text, userId }).then((data) => {
-		console.log(data);
-		return data;
+		return this.getById(data.dataValues.id);
 	});
 }
 
